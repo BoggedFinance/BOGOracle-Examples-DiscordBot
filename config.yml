@@ -1,0 +1,33 @@
+discord_bog:
+  discord_token_key: BOG_BOT_TOKEN
+  bsc_rpc_url: https://bsc-dataseed.binance.org/
+  token_name: BOG
+  oracle_address: "0xb9A8e322aff57556a2CC00c89Fad003a61C5ac41"
+  oracle_version: 1
+  avatar_file: bog.png
+
+discord_eth:
+  discord_token_key: ETH_BOT_TOKEN
+  bsc_rpc_url: https://bsc-dataseed.binance.org/
+  token_name: ETH
+  oracle_address: "0x8eDE89fd5A76591F02530FB396627275dD5d0dcb"
+  oracle_version: 2
+  avatar_file: eth.png
+
+discord_cake:
+  discord_token_key: CAKE_BOT_TOKEN
+  bsc_rpc_url: https://bsc-dataseed.binance.org/
+  token_name: CAKE
+  oracle_address: "0x81d67180b84f5Bba6023ae9c873C6863fE879F91"
+  oracle_version: 2
+  avatar_file: cake.png
+
+discord_bnb:
+  discord_token_key: BNB_BOT_TOKEN
+  bsc_rpc_url: https://bsc-dataseed.binance.org/
+  token_name: BNB
+  oracle_address: "0x8eDE89fd5A76591F02530FB396627275dD5d0dcb"
+  oracle_version: 2
+  avatar_file: bnb.png
+  
+  

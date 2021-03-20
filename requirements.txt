@@ -1,0 +1,4 @@
+discord
+python-dotenv
+web3
+pyyaml
