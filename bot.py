@@ -16,11 +16,12 @@ with open("config.yml", "r") as yaml_in:
 
 # get a functioning contract object from just an address, courtesy of bscscan
 # TODO: if we get rate limited or similar, start using a real API key
-def get_contract(w3, address):
-    abi_url = f"https://api.bscscan.com/api?module=contract&action=getabi&address={address}&format=raw"
-    abi_raw = requests.get(abi_url).content.decode("utf-8")
+def get_contract(w3, address, abi_raw=None):
+    if abi_raw == None:
+        abi_url = f"https://api.bscscan.com/api?module=contract&action=getabi&address={address}&format=raw"
+        abi_raw = requests.get(abi_url).content.decode("utf-8")
     contract = w3.eth.contract(address, abi=abi_raw)
-    return contract
+    return contract, abi_raw
 
 
 class DiscordW3ClientBot:
@@ -30,6 +31,7 @@ class DiscordW3ClientBot:
         self.token = token
         self.guild_id = guild_id
         self.config = config
+        self.abi = None
         self.on_ready = self.client.event(self.on_ready)
 
     async def on_ready(self):
@@ -82,7 +84,8 @@ class DiscordW3ClientBot:
         count = 0
         while True:
             w3 = Web3(Web3.HTTPProvider(self.config["bsc_rpc_url"]))
-            oracle = get_contract(w3, self.config["oracle_address"])
+            oracle, abi = get_contract(w3, self.config["oracle_address"], self.abi)
+            self.abi = abi
             guild = self.client.get_guild(id=self.guild_id)
             member = guild.get_member(self.client.user.id)
 
