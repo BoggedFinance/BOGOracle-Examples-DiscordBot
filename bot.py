@@ -83,24 +83,33 @@ class DiscordW3ClientBot:
 
         count = 0
         while True:
-            w3 = Web3(Web3.HTTPProvider(self.config["bsc_rpc_url"]))
-            oracle, abi = get_contract(w3, self.config["oracle_address"], self.abi)
-            self.abi = abi
-            guild = self.client.get_guild(id=self.guild_id)
-            member = guild.get_member(self.client.user.id)
+            # this is lazy, but I don't want these to go down again
+            # Swallow any and all exceptions for now; the show must go on!
+            # TODO: handle errors more gracefully (issue #6)
+            try:
+                w3 = Web3(Web3.HTTPProvider(self.config["bsc_rpc_url"]))
+                oracle, abi = get_contract(w3, self.config["oracle_address"], self.abi)
+                self.abi = abi
+                guild = self.client.get_guild(id=self.guild_id)
+                member = guild.get_member(self.client.user.id)
 
-            token_price = 0
-            if self.config["oracle_version"] == 1:
-                token_price = self.calc_price_v1(oracle)
-            else:
-                token_price = self.calc_price_v2(oracle, self.config["token_name"] == "BNB")
+                token_price = 0
+                if self.config["oracle_version"] == 1:
+                    token_price = self.calc_price_v1(oracle)
+                else:
+                    token_price = self.calc_price_v2(oracle, self.config["token_name"] == "BNB")
 
-            await self.apply_presence(count)
-            await member.edit(nick=f"{self.config['token_name']}: ${token_price:0.2f}")
-            count += 1
-            
-            # give the free APIs we are using a break
-            await asyncio.sleep(10)
+                await self.apply_presence(count)
+                await member.edit(nick=f"{self.config['token_name']}: ${token_price:0.2f}")
+                count += 1
+                
+                # give the free APIs we are using a break
+                await asyncio.sleep(10)
+            except Exception as e:
+                print(f"!!!!!!!! exception on count {count}")
+                print(e)
+                print("sleep 20s and carry on")
+                await asyncio.sleep(10)
 
     def start(self):
         return self.client.start(self.token)
