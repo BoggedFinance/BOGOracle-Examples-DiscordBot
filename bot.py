@@ -72,36 +72,35 @@ class DiscordW3ClientBot:
         token_price = token_spot / (10 ** token_decimals)
         return token_price
 
-
     async def _apply_presence(self, presence_str):
         activity = discord.Activity(type=discord.ActivityType.watching,
                                     name=presence_str)
         return await self.client.change_presence(activity=activity)
 
-
     async def apply_thinking_presence(self, count):
         """ updates the thinking spinner and references bogtools.io """
         # add a unique char that changes on each iter so you can tell if the bot is updating or stale
-        thinking_chars = "⣾⣽⣻⢿⡿⣟⣯⣷"
-        think_char = thinking_chars[count % len(thinking_chars)]
-        think_str = f"{think_char} bogtools.io oracle"
-        return await self._apply_presence(think_str)
+        if not self.updates_are_stalled():
+            thinking_chars = "⣾⣽⣻⢿⡿⣟⣯⣷"
+            think_char = thinking_chars[count % len(thinking_chars)]
+            think_str = f"{think_char} bogtools.io oracle"
+            return await self._apply_presence(think_str)
 
+    def updates_are_stalled(self):
+        return (datetime.datetime.now() - self.last_update_time).total_seconds() > 15
 
     async def status_watchdog(self):
         """ periodic task that ensures status_task keeps running """
         try:
             while True:
                 await asyncio.sleep(5)
-                now = datetime.datetime.now()
-                if (now - self.last_update_time).total_seconds() > 15:
+                if self.updates_are_stalled():
                     await self._apply_presence("ERROR: data may be stale!")
 
         except Exception as e:
             print(f"watchdog raised exception: {e}")
             print(f"not safe to continue without a watchdog, exiting!")
             sys.exit(1)
-
 
     async def status_task(self):
         """ periodic task that fetches price and updates the bot's data """
