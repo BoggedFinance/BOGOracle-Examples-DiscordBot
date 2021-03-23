@@ -1,7 +1,9 @@
 import asyncio
+import datetime
 import discord
 import os
 import requests
+import sys
 import threading
 import yaml
 from web3 import Web3
@@ -27,6 +29,7 @@ def get_contract(w3, address, abi_raw=None):
 class DiscordW3ClientBot:
     """ marries a discord.Client(...) with a web3.Web3(...) """
     def __init__(self, token, guild_id, config):
+        self.last_update_time = datetime.datetime.now()
         self.client = discord.Client()
         self.token = token
         self.guild_id = guild_id
@@ -38,8 +41,9 @@ class DiscordW3ClientBot:
         """ things we should only run once at startup """
         print(f'{self.config["token_name"]} connected as {self.client.user}')
 
-        # add the periodic task that will check the oracle for a price
+        # add the periodic tasks that will check the oracle for a price and update status
         self.client.loop.create_task(self.status_task())
+        self.client.loop.create_task(self.status_watchdog())
 
         # set the bot avatar, per config
         with open(self.config["avatar_file"], "rb") as avatar_in:
@@ -68,14 +72,35 @@ class DiscordW3ClientBot:
         token_price = token_spot / (10 ** token_decimals)
         return token_price
 
-    async def apply_presence(self, count):
-        """ updates the thinking spinner and references bogtools.io """
 
+    async def _apply_presence(self, presence_str):
+        activity = discord.Activity(type=discord.ActivityType.watching,
+                                    name=presence_str)
+        return await self.client.change_presence(activity=activity)
+
+
+    async def apply_thinking_presence(self, count):
+        """ updates the thinking spinner and references bogtools.io """
         # add a unique char that changes on each iter so you can tell if the bot is updating or stale
         thinking_chars = "⣾⣽⣻⢿⡿⣟⣯⣷"
-        activity = discord.Activity(type=discord.ActivityType.watching,
-                                    name=f"{thinking_chars[count % len(thinking_chars)]} bogtools.io oracle")
-        return await self.client.change_presence(activity=activity)
+        think_char = thinking_chars[count % len(thinking_chars)]
+        think_str = f"{think_char} bogtools.io oracle"
+        return await self._apply_presence(think_str)
+
+
+    async def status_watchdog(self):
+        """ periodic task that ensures status_task keeps running """
+        try:
+            while True:
+                await asyncio.sleep(5)
+                now = datetime.datetime.now()
+                if (now - self.last_update_time).total_seconds() > 15:
+                    await self._apply_presence("ERROR: data may be stale!")
+
+        except Exception as e:
+            print(f"watchdog raised exception: {e}")
+            print(f"not safe to continue without a watchdog, exiting!")
+            sys.exit(1)
 
 
     async def status_task(self):
@@ -83,33 +108,35 @@ class DiscordW3ClientBot:
 
         count = 0
         while True:
+            count += 1
+
             # this is lazy, but I don't want these to go down again
             # Swallow any and all exceptions for now; the show must go on!
             # TODO: handle errors more gracefully (issue #6)
             try:
-                w3 = Web3(Web3.HTTPProvider(self.config["bsc_rpc_url"]))
-                oracle, abi = get_contract(w3, self.config["oracle_address"], self.abi)
-                self.abi = abi
-                guild = self.client.get_guild(id=self.guild_id)
-                member = guild.get_member(self.client.user.id)
+                await self.apply_thinking_presence(count)
+                if count % 2 == 0:
+                    w3 = Web3(Web3.HTTPProvider(self.config["bsc_rpc_url"]))
+                    oracle, abi = get_contract(w3, self.config["oracle_address"], self.abi)
+                    self.abi = abi
+                    guild = self.client.get_guild(id=self.guild_id)
+                    member = guild.get_member(self.client.user.id)
 
-                token_price = 0
-                if self.config["oracle_version"] == 1:
-                    token_price = self.calc_price_v1(oracle)
-                else:
-                    token_price = self.calc_price_v2(oracle, self.config["token_name"] == "BNB")
+                    token_price = 0
+                    if self.config["oracle_version"] == 1:
+                        token_price = self.calc_price_v1(oracle)
+                    else:
+                        token_price = self.calc_price_v2(oracle, self.config["token_name"] == "BNB")
 
-                await self.apply_presence(count)
-                await member.edit(nick=f"{self.config['token_name']}: ${token_price:0.2f}")
-                count += 1
-                
-                # give the free APIs we are using a break
-                await asyncio.sleep(10)
+                    await member.edit(nick=f"{self.config['token_name']}: ${token_price:0.2f}")
+                    self.last_update_time = datetime.datetime.now()
             except Exception as e:
                 print(f"!!!!!!!! exception on count {count}")
                 print(e)
-                print("sleep 20s and carry on")
+                print("sleep 10s and carry on")
                 await asyncio.sleep(10)
+
+            await asyncio.sleep(6)
 
     def start(self):
         return self.client.start(self.token)
