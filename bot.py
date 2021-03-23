@@ -49,6 +49,8 @@ class DiscordW3ClientBot:
         # set the bot avatar, per config
         with open(self.config["avatar_file"], "rb") as avatar_in:
             avatar_data = avatar_in.read()
+        await self._apply_presence("Initializing...")
+        await self._apply_nick("Initializing...")
         await self.client.user.edit(username=f'{self.config["token_name"]}-Oraclebot', avatar=avatar_data)
     
     def calc_price_v1(self, oracle):
@@ -104,6 +106,12 @@ class DiscordW3ClientBot:
             print(f"not safe to continue without a watchdog, exiting!")
             sys.exit(1)
 
+    async def _apply_nick(self, nick_str):
+        guild = self.client.get_guild(id=self.guild_id)
+        member = guild.get_member(self.client.user.id)
+        await member.edit(nick=nick_str)
+
+
     async def status_task(self):
         """ periodic task that fetches price and updates the bot's data """
 
@@ -115,22 +123,19 @@ class DiscordW3ClientBot:
             # Swallow any and all exceptions for now; the show must go on!
             # TODO: handle errors more gracefully (issue #6)
             try:
-                await self.apply_thinking_presence(count)
                 if count % 2 == 0:
                     w3 = Web3(Web3.HTTPProvider(self.config["bsc_rpc_url"]))
                     oracle, abi = get_contract(w3, self.config["oracle_address"], self.abi)
                     self.abi = abi
-                    guild = self.client.get_guild(id=self.guild_id)
-                    member = guild.get_member(self.client.user.id)
 
                     token_price = 0
                     if self.config["oracle_version"] == 1:
                         token_price = self.calc_price_v1(oracle)
                     else:
                         token_price = self.calc_price_v2(oracle, self.config["token_name"] == "BNB")
-
-                    await member.edit(nick=f"{self.config['token_name']}: ${token_price:0.2f}")
                     self.last_update_time = datetime.datetime.now()
+                    await self._apply_nick(f"{self.config['token_name']}: ${token_price:0.2f}")
+                await self.apply_thinking_presence(count)
             except Exception as e:
                 print(f"!!!!!!!! exception on count {count}")
                 traceback.print_exc()
