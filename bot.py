@@ -5,6 +5,7 @@ import os
 import requests
 import sys
 import threading
+import traceback
 import yaml
 from web3 import Web3
 from dotenv import load_dotenv
@@ -98,6 +99,7 @@ class DiscordW3ClientBot:
                     await self._apply_presence("ERROR: data may be stale!")
 
         except Exception as e:
+            traceback.print_exc()
             print(f"watchdog raised exception: {e}")
             print(f"not safe to continue without a watchdog, exiting!")
             sys.exit(1)
@@ -131,7 +133,7 @@ class DiscordW3ClientBot:
                     self.last_update_time = datetime.datetime.now()
             except Exception as e:
                 print(f"!!!!!!!! exception on count {count}")
-                print(e)
+                traceback.print_exc()
                 print("sleep 10s and carry on")
                 await asyncio.sleep(10)
 
