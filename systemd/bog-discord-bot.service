@@ -1,0 +1,13 @@
+[Unit]
+Description=BOG Discord bot
+After=network-online.target
+Wants=network-online.target systemd-networkd-wait-online.service
+
+[Service]
+Restart=always
+RestartSec=30s
+ExecStart=/opt/BOGOracle-Examples-DiscordBot/systemd/bog-discord-bot.sh
+WorkingDirectory=/opt/BOGOracle-Examples-DiscordBot
+
+[Install]
+WantedBy=multi-user.target

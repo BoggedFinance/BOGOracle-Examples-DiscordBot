@@ -88,7 +88,7 @@ class DiscordW3ClientBot:
             return await self._apply_presence(think_str)
 
     def updates_are_stalled(self):
-        return (datetime.datetime.now() - self.last_update_time).total_seconds() > 15
+        return (datetime.datetime.now() - self.last_update_time).total_seconds() > 24  # 2 web3 polling cycles = 24s
 
     async def status_watchdog(self):
         """ periodic task that ensures status_task keeps running """

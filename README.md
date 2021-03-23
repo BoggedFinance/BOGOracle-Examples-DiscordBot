@@ -20,3 +20,13 @@ Using $BOG oracles to show live price in a discord bot
 
 (note: on a cloud provider you may want to use `nohup` to ensure the bot continues running
 after you have disconnected, but a future release here will include upstart documentation)
+
+## Install as a systemd service
+
+The discordbot can also be installed as an auto-restarting service in systemd:
+
+1. `sudo cp ~/path/to/existing/BOGOracle-Examples-DiscordBot /opt/BOGOracle-Examples-DiscordBot`
+1. `sudo chown youruser:youruser /opt/BOGOracle-Examples-DiscordBot`
+1. `sudo cp /opt/BOGOracle-Examples-DiscordBot/systemd/bog-discord-bot.service /etc/systemd/system/bog-discord-bot.service`
+1. `sudo systemctl start bog-discord-bot`
+1. Confirm it is running: `sudo systemctl status bog-discord-bot`
