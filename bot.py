@@ -1,14 +1,18 @@
 import asyncio
 import datetime
 import discord
+import json
 import os
 import requests
 import sys
-import threading
 import traceback
 import yaml
 from web3 import Web3
 from dotenv import load_dotenv
+
+BOGINFO_ABI = json.loads('[{"inputs":[],"name":"getBNBSpotPrice","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"tokenA","type":"address"},{"internalType":"address","name":"tokenB","type":"address"}],"name":"getPair","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"adr","type":"address"}],"name":"getTokenInfo","outputs":[{"internalType":"string","name":"name","type":"string"},{"internalType":"string","name":"symbol","type":"string"},{"internalType":"uint8","name":"decimals","type":"uint8"},{"internalType":"uint256","name":"totalSupply","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"tokenIn","type":"address"},{"internalType":"address","name":"tokenOut","type":"address"}],"name":"getTokenTokenPrice","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"PRICE_DECIMALS","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}]')
+BOGINFO_ADDR = "0x0Bd91f45FcA6428680C02a79A2496D6f97BDF24a"
+WBNB_ADDR = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
 
 # pull our secrets in
 load_dotenv()
@@ -35,7 +39,8 @@ class DiscordW3ClientBot:
         self.token = token
         self.guild_id = guild_id
         self.config = config
-        self.abi = None
+        self.w3 = Web3(Web3.HTTPProvider(self.config["bsc_rpc_url"]))
+        self.oracle = self.w3.eth.contract(BOGINFO_ADDR, abi=BOGINFO_ABI)
         self.on_ready = self.client.event(self.on_ready)
 
     async def on_ready(self):
@@ -53,27 +58,12 @@ class DiscordW3ClientBot:
         await self._apply_nick("Initializing...")
         await self.client.user.edit(username=f'{self.config["token_name"]}-Oraclebot', avatar=avatar_data)
     
-    def calc_price_v1(self, oracle):
-        """ oracle v1 algorithm """
-        token_spot = oracle.functions.getSpotPrice().call()
-        bnb_spot = oracle.functions.getBNBSpotPrice().call()
-
-        token_price = (1000000 / token_spot) * (1000000 / bnb_spot)
-        return token_price
-
-    def calc_price_v2(self, oracle, use_bnb_spot=False):
-        """ oracle v2 algorithm """
-        
-        # in case we just want the bnb spot price
-        if use_bnb_spot:
-            token_spot = oracle.functions.getBNBSpotPrice().call()
-        else:
-            token_spot = oracle.functions.getSpotPrice().call()
-        token_decimals = oracle.functions.getDecimals().call()
-
-        # apply correct number of decimals to get the human-readable value
-        token_price = token_spot / (10 ** token_decimals)
-        return token_price
+    def calc_price(self, token_addr):
+        wbnb_price = self.oracle.functions.getBNBSpotPrice().call() / 10 ** 18
+        if token_addr == WBNB_ADDR:
+            return wbnb_price
+        token_token_price = self.oracle.functions.getTokenTokenPrice(token_addr, WBNB_ADDR).call() / 10 ** 18
+        return token_token_price * wbnb_price
 
     async def _apply_presence(self, presence_str):
         activity = discord.Activity(type=discord.ActivityType.watching,
@@ -124,15 +114,9 @@ class DiscordW3ClientBot:
             # TODO: handle errors more gracefully (issue #6)
             try:
                 if count % 2 == 0:
-                    w3 = Web3(Web3.HTTPProvider(self.config["bsc_rpc_url"]))
-                    oracle, abi = get_contract(w3, self.config["oracle_address"], self.abi)
-                    self.abi = abi
 
-                    token_price = 0
-                    if self.config["oracle_version"] == 1:
-                        token_price = self.calc_price_v1(oracle)
-                    else:
-                        token_price = self.calc_price_v2(oracle, self.config["token_name"] == "BNB")
+                    token_price = self.calc_price(self.config['token_addr'])
+                    
                     self.last_update_time = datetime.datetime.now()
                     await self._apply_nick(f"{self.config['token_name']}: ${token_price:0.2f}")
                 await self.apply_thinking_presence(count)
